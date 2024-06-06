@@ -35,6 +35,7 @@ def apply_mask(stftMat, mask):
     S_masked = real_masked + 1j * imag_masked
 
     iStftMat = lr.istft(S_masked, 
+                        win_length= int(fs*0.008),
                         hop_length= int(fs*0.001), 
                         window='hann')
     return iStftMat, S_masked
@@ -65,7 +66,7 @@ df['length'] = df['offset_sample'] - df['onset_sample']
 category_counts = df['label'].value_counts()
 print(category_counts)
 df = df[df['length'] >= 300]
-df = df[df['label'] == 1]
+df = df[df['label'] == 2]
 df.reset_index(drop=True, inplace=True)
 
 # Iterate across rows
@@ -79,6 +80,7 @@ for index, row in df.iterrows():
     # Generate mask
     stftMat = lr.stft(piezo_temp, 
                     n_fft= 1024, 
+                    win_length=int(fs*0.008),
                     hop_length=int(fs*0.001), 
                     center=True, 
                     window='hann')
@@ -86,6 +88,7 @@ for index, row in df.iterrows():
                     y = piezo_temp, 
                     sr=fs,
                     n_fft=2048, 
+                    #win_length=int(fs*0.008),
                     hop_length=int(fs*0.001), 
                     center=True, 
                     window='hann',
@@ -95,15 +98,16 @@ for index, row in df.iterrows():
     
     stftMat2 = lr.stft(amb_temp, 
                     n_fft= 1024, 
+                    win_length=int(fs*0.008),
                     hop_length=int(fs*0.001), 
                     center=True, 
                     window='hann')
 
-    abs_piezo_spec = np.abs(stftMat)
+    abs_piezo_spec = np.abs(stftMat)**2
     log_piezo = np.abs(10 * np.log10(abs_piezo_spec))
 
     # Apply binary thresholding
-    threshold_value = 15
+    threshold_value = 45
     _, mask = cv2.threshold(log_piezo, threshold_value, 255, cv2.THRESH_BINARY)
     mask = 255 - mask
     mask = cv2.inRange(mask, 254, 255)
@@ -138,14 +142,16 @@ for index, row in df.iterrows():
     corr_val = np.correlate(iStftMat, iStftMat2)
     #print(corr_val)
 
-    plt.figure(1, figsize=(6,4))
-    plt.subplot(2,1,1)
+    plt.figure(1, figsize=(6,3))
+    #plt.subplot(2,1,1)
     plt.title(f"Piezo-Amb Masked Corr: {np.round(corr_val[0],6)}")
-    plt.plot(t, iStftMat, color='b')
+    plt.plot(t, piezo_temp, color='g', linewidth=1)
+    plt.plot(t, iStftMat, color='b', linewidth=1)
     plt.plot(t, iStftMat2, color='r')
-    plt.legend(['Piezo', 'Amb'])
+    plt.legend(['Orig','Piezo', 'Amb'], fontsize=8)
     plt.grid(True)
     plt.xlim(0,t[-1])
+    plt.xlabel('Time (s)')
 
 
     corr_val = np.correlate(piezo_temp, iStftMat)
@@ -155,7 +161,7 @@ for index, row in df.iterrows():
 
     #normalized = (corr_val - np.min(corr_val)) / (np.max(corr_val) - np.min(corr_val))
 
-    plt.subplot(2,1,2)
+    """plt.subplot(2,1,2)
     plt.title(f"Piezo Corr: {np.round(corr_val[0],3)}")
     plt.plot(t, piezo_temp, color='g')
     plt.plot(t, iStftMat, color='b')
@@ -163,9 +169,9 @@ for index, row in df.iterrows():
     plt.legend(['orig', 'masked'])
     plt.xlim(0,t[-1])
     plt.xlabel('Time (s)')
-    plt.grid(True)
+    plt.grid(True)"""
     plt.tight_layout()
-    plt.show()
+    #plt.show()
     plt.savefig("temp_fig/figure.png")
     plt.clf()
 
@@ -174,30 +180,30 @@ for index, row in df.iterrows():
     #cv2.imshow("amb", np.abs(stftMat2))
     #cv2.imshow("piezo_recon", np.abs(S_masked))
     #cv2.imshow("piezo_recon2", np.abs(S_masked2))
-
+    
     # Mask
     mask = cv2.rotate(mask, cv2.ROTATE_180)
     mask = cv2.flip(mask, 1) # Flip horizontally
-    cv2.imshow("mask_piezo", mask)
+    #cv2.imshow("mask_piezo", mask)
     cv2.imwrite("temp_fig/mask.jpg", mask)
     
     # Convert spectrograms
-    normalized_image1, colormap1 = spec2dB(stftMat) # Piezo
+    normalized_image1, colormap1 = spec2dB(stftMat**2) # Piezo
     #cv2.imshow("piezo", colormap1)
     cv2.imwrite("temp_fig/orig_piezo.jpg", normalized_image1)
     cv2.imwrite("temp_fig/orig_piezo_cm.jpg", colormap1)
 
-    normalized_image2, colormap2 = spec2dB(stftMat2) # Amb
+    normalized_image2, colormap2 = spec2dB(stftMat2**2) # Amb
     #cv2.imshow("amb", colormap2)
     cv2.imwrite("temp_fig/orig_amb.jpg", normalized_image2)
     cv2.imwrite("temp_fig/orig_amb_cm.jpg", colormap2)
 
-    normalized_image3, colormap3 = spec2dB(S_masked) # Piezo_masked
+    normalized_image3, colormap3 = spec2dB(S_masked**2) # Piezo_masked
     #cv2.imshow("masked_piezo", colormap3)
     cv2.imwrite("temp_fig/masked_piezo.jpg", normalized_image3)
     cv2.imwrite("temp_fig/masked_piezo_cm.jpg", colormap3)
 
-    normalized_image4, colormap4 = spec2dB(S_masked2)   # Amb_masked
+    normalized_image4, colormap4 = spec2dB(S_masked2**2)   # Amb_masked
     #cv2.imshow("masked_amb", colormap4)
     cv2.imwrite("temp_fig/masked_amb.jpg", normalized_image4)
     cv2.imwrite("temp_fig/masked_amb_cm.jpg", colormap4)
@@ -221,7 +227,8 @@ for index, row in df.iterrows():
     print(corr2d.shape)"""
 
     # Merge images for display
-    merged = np.concatenate((colormap1, colormap2, colormap3, colormap4), axis=1)
+    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    merged = np.concatenate((mask, colormap1, colormap2, colormap3, colormap4), axis=1)
     cv2.imshow("merged", merged)
     cv2.imwrite("temp_fig/merged_cm.jpg", merged)
 
