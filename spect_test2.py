@@ -66,7 +66,7 @@ df['length'] = df['offset_sample'] - df['onset_sample']
 category_counts = df['label'].value_counts()
 print(category_counts)
 df = df[df['length'] >= 300]
-df = df[df['label'] == 2]
+df = df[df['label'] == 1]
 df.reset_index(drop=True, inplace=True)
 
 # Iterate across rows
