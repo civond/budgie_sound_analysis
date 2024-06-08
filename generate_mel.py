@@ -57,10 +57,10 @@ def spec2dB(spec, show_img = False):
         return normalized_image#, colormap
 
     
-[y_piezo, fs] = load_filter_audio('data/test.flac')
+[y_piezo, fs] = load_filter_audio('data/bl122_piezo.flac')
 
 # Create Dataset
-df = pd.read_csv('data/test.txt', sep='\t', header=None)
+df = pd.read_csv('data/bl122_short.txt', sep='\t', header=None)
 df.rename(columns={0: 'onset', 1: 'offset', 2: 'label'}, inplace=True)
 df['onset_sample'] = (df['onset'] * fs).astype(int)
 df['offset_sample'] = (df['offset'] * fs).astype(int)
