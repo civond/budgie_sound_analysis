@@ -40,7 +40,7 @@ for index, row in df.iterrows():
     # Create mask and apply binary thresholding
     abs_piezo_spec = np.abs(stftMat)**2
     log_piezo = np.abs(10 * np.log10(abs_piezo_spec))
-    threshold_value = 20
+    threshold_value = 30
     _, mask = cv2.threshold(log_piezo, threshold_value, 255, cv2.THRESH_BINARY)
     mask = 255 - mask
     mask = cv2.inRange(mask, 254, 255)

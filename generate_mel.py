@@ -41,20 +41,62 @@ def apply_mask(stftMat, mask):
 
 # Convert spectrogramn to dB and rotate 180 degrees
 def spec2dB(spec, show_img = False):
-        db = lr.amplitude_to_db(np.abs(spec), ref=np.max)
-        normalized_image = cv2.normalize(db, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U) # Normalize
-        clahe = cv2.createCLAHE(clipLimit=5, tileGridSize=(8,8))
-        normalized_image = clahe.apply(normalized_image)
-        
-        normalized_image = cv2.rotate(normalized_image, cv2.ROTATE_180) # Rotate 180 degrees
-        normalized_image = cv2.flip(normalized_image, 1) # Flip horizontally
-        #colormap = cv2.applyColorMap(normalized_image, cv2.COLORMAP_JET) # Apply colormap
-        #print(normalized_image)
-        if show_img == True:
-            cv2.imshow("piezo", normalized_image)#, colormap)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-        return normalized_image#, colormap
+    db = lr.amplitude_to_db(np.abs(spec), ref=np.max)
+    normalized_image = cv2.normalize(db, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U) # Normalize
+    normalized_image = cv2.rotate(normalized_image, cv2.ROTATE_180) # Rotate 180 degrees
+    normalized_image = cv2.flip(normalized_image, 1) # Flip horizontally
+
+    # CLAHE
+    clahe = cv2.createCLAHE(clipLimit=3, tileGridSize=(8,8))
+    normalized_image = clahe.apply(normalized_image)
+    
+
+    """
+    # Filtering
+    F = np.fft.fft2(normalized_image)
+    Fshift = np.fft.fftshift(F)
+
+    [M,N] = normalized_image.shape
+    order = 3
+
+    #Cutoff Frequencies
+    D0_low = 30
+    D0_high = 15
+
+    # Low Pass
+    H1 = np.zeros((M,N), dtype=np.float32)
+    for u in range(M):
+        for v in range(N):
+            D = np.sqrt((u-M/2)**2 + (v-N/2)**2)
+            H1[u,v] = 1 / (1 + (D/D0_low)**order)
+    #High Pass
+    H2 = np.zeros((M,N), dtype=np.float32)
+    for u in range(M):
+        for v in range(N):
+            D = np.sqrt((u-M/2)**2 + (v-N/2)**2)
+            H2[u,v] = 1 / (1 + (D0_high/D)**order)
+            
+    # Combining filters
+    H_bandpass = H1 * H2
+    Gshift = Fshift * H_bandpass
+    G = np.fft.ifftshift(Gshift)
+    g_bandpass = np.abs(np.fft.ifft2(G) )
+
+    result = normalized_image-g_bandpass
+    result = np.clip(result, 0, 255).astype(np.uint8)
+    print(result)
+
+    cv2.imshow("test2",result)
+    cv2.imshow("G", g_bandpass)
+    cv2.imshow("BP", H_bandpass)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    """
+    if show_img == True:
+        cv2.imshow("piezo", normalized_image)#, colormap)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    return normalized_image#, colormap
 
     
 [y_piezo, fs] = load_filter_audio('data/bl122_piezo.flac')
@@ -112,14 +154,6 @@ for index, row in df.iterrows():
 
     abs_piezo_spec = np.abs(stftMat_mel)
     log_piezo = np.abs(10 * np.log10(abs_piezo_spec))
-
-    # Apply binary thresholding
-    threshold_value = 20
-    _, mask = cv2.threshold(log_piezo, threshold_value, 255, cv2.THRESH_BINARY)
-    mask = 255 - mask
-    mask = cv2.inRange(mask, 254, 255)
-    mask = cv2.rotate(mask, cv2.ROTATE_180)
-    mask = cv2.flip(mask, 1) # Flip horizontally
     
     
     normalized_image1 = spec2dB(stftMat_mel) # Piezo
@@ -128,7 +162,7 @@ for index, row in df.iterrows():
     #cv2.imshow("test1",colormap1)
     #cv2.imshow("test2",normalized_image1)
     cv2.imwrite(f"spectrograms/{int(row['onset_sample'])}.jpg", normalized_image1)
-    cv2.imwrite(f"mask/{int(row['onset_sample'])}.jpg", mask)
+    #cv2.imwrite(f"mask/{int(row['onset_sample'])}.jpg", mask)
     #cv2.imwrite("temp_fig/mask.jpg", mask)
     #cv2.waitKey(0)
     #cv2.destroyAllWindows()
