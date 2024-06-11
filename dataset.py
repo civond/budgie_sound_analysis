@@ -19,14 +19,10 @@ class ImageDataset(Dataset):
 
         if self.transform is not None:
             image = self.transform(image)
-
-        label = None
-        if img_path.split('/')[1].split("_")[1] == "voc":
-            print(img_path.split('/')[1].split("_")[1] == "voc")
+            
+        if img_path.split("_")[1].split("\\")[0] == "voc":
             label = 0
-        elif img_path.split('/')[1].split("_")[1] == "noise":
-            print(img_path.split('/')[1].split("_")[1] == "voc")
+        elif img_path.split("_")[1].split("\\")[0] == "noise":
             label = 1
 
-        print(label)
         return image, label
