@@ -5,6 +5,7 @@ import librosa as lr
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 import cv2
+import os
 
 # Filter audio
 def load_filter_audio(path):
@@ -16,28 +17,6 @@ def load_filter_audio(path):
                         fs=fs)
     y = signal.filtfilt(b,a,y)
     return [y, fs]
-
-# Generate masked audio
-def apply_mask(stftMat, mask):
-    real_part = stftMat.real * 32767
-    imag_part = stftMat.imag * 32767 
-
-    real_masked = cv2.bitwise_and(real_part, 
-                                  real_part, 
-                                  mask=mask)
-    imag_masked = cv2.bitwise_and(imag_part, 
-                                  imag_part, 
-                                  mask=mask)
-    # Convert the masked parts back to the original type
-    real_masked = real_masked / 32767 
-    imag_masked = imag_masked / 32767 
-
-    S_masked = real_masked + 1j * imag_masked
-
-    iStftMat = lr.istft(S_masked, 
-                        hop_length= int(fs*0.001), 
-                        window='hann')
-    return iStftMat, S_masked
 
 # Convert spectrogramn to dB and rotate 180 degrees
 def spec2dB(spec, show_img = False):
@@ -98,73 +77,84 @@ def spec2dB(spec, show_img = False):
         cv2.destroyAllWindows()
     return normalized_image#, colormap
 
+
+audio_paths = ["audio/Bl122.flac",
+            "audio/Li145.flac",
+            "audio/Or61.flac",
+            "audio/Ti81.flac"]
+label_paths = ["audio/Bl122.txt",
+            "audio/Li145.txt",
+            "audio/Or61.txt",
+            "audio/Ti81.txt"]
+
+write_dir = "audio/"
+df_list = []
+
+for index, audio in enumerate(audio_paths):
+    audio_name = audio.split('/')[1].split(".")[0]
+
+    # Create Dataset
+    fs = 30_000
+    df = pd.read_csv(label_paths[index], 
+                     sep='\t', 
+                     header=None)
     
-[y_piezo, fs] = load_filter_audio('data/bl122_piezo.flac')
+    df.rename(columns={0: 'onset', 1: 'offset', 2: 'label'}, inplace=True)
+    df['onset_sample'] = (df['onset'] * fs).astype(int)
+    df['offset_sample'] = (df['offset'] * fs).astype(int)
+    df['length'] = df['offset_sample'] - df['onset_sample']
+    df['path'] = df['onset_sample'].astype(str).apply(lambda x: os.path.join(write_dir, audio_name+ '_' + x + '.jpg'))
+    df['bird'] = str(audio_name)
 
-# Create Dataset
-df = pd.read_csv('data/bl122_short.txt', sep='\t', header=None)
-df.rename(columns={0: 'onset', 1: 'offset', 2: 'label'}, inplace=True)
-df['onset_sample'] = (df['onset'] * fs).astype(int)
-df['offset_sample'] = (df['offset'] * fs).astype(int)
-df['length'] = df['offset_sample'] - df['onset_sample']
+    category_counts = df['label'].value_counts()
+    print(category_counts)
+    #df = df[df['length'] >= 300]
+    #df = df[df['label'] == 2]
+    #df.reset_index(drop=True, inplace=True)
+    df_list.append(df)
 
-category_counts = df['label'].value_counts()
-print(category_counts)
-df = df[df['length'] >= 300]
-#df = df[df['label'] == 2]
-df.reset_index(drop=True, inplace=True)
-df.to_csv("meta.csv")
-print(df)
 
-# Iterate across rows
-for index, row in df.iterrows():
-    start = int(row['onset_sample'])
-    end = int(row['offset_sample'])
+    # Iterate across rows
+    [y_piezo, fs] = load_filter_audio(audio_paths[index])
+    for index, row in df.iterrows():
+        start = int(row['onset_sample'])
+        end = int(row['offset_sample'])
 
-    piezo_temp = y_piezo[start:end]
-    temp = np.zeros(int(fs*0.255))
-    """if len(piezo_temp) > int(fs*0.255):
-         piezo_temp = piezo_temp[0:(int(fs*0.255))]
-    else:
-        temp[0:len(piezo_temp)] = piezo_temp
-        piezo_temp = temp"""
-    
+        piezo_temp = y_piezo[start:end]
+        temp = np.zeros(int(fs*0.255))
 
-    [mul, rem] = np.divmod(fs*0.254,len(piezo_temp))
-    piezo_temp = np.tile(piezo_temp, int(mul+1))
-    piezo_temp = piezo_temp[0:int(fs*0.224)]
+        # Tiling the audio
+        [mul, rem] = np.divmod(fs*0.254,len(piezo_temp))
+        piezo_temp = np.tile(piezo_temp, int(mul+1))
+        piezo_temp = piezo_temp[0:int(fs*0.224)]
 
-    # Generate mask
-    """stftMat_mel = lr.stft(piezo_temp, 
-                    n_fft= 512, 
-                    hop_length=int(fs*0.001), 
-                    center=True, 
-                    window='hann')"""
-    stftMat_mel = lr.feature.melspectrogram(
-                    y = piezo_temp, 
-                    sr=fs,
-                    n_fft=2048, 
-                    win_length=int(fs*0.008),
-                    hop_length=int(fs*0.001), 
-                    center=True, 
-                    window='hann',
-                    n_mels=225,
-                    fmax=10000)
-    print(stftMat_mel.shape)
+        # Create Mel Spectrogram
+        stftMat_mel = lr.feature.melspectrogram(
+                        y = piezo_temp, 
+                        sr=fs,
+                        n_fft=2048, 
+                        win_length=int(fs*0.008),
+                        hop_length=int(fs*0.001), 
+                        center=True, 
+                        window='hann',
+                        n_mels=225,
+                        fmax=10000)
+        print(stftMat_mel.shape)
+        
+        normalized_image1 = spec2dB(stftMat_mel) # Piezo
+        
+        #cv2.imshow("mask_piezo", mask)
+        #cv2.imshow("test1",colormap1)
+        #cv2.imshow("test2",normalized_image1)
+        cv2.imwrite(row['path'], normalized_image1)
+        #cv2.imwrite(f"mask/{int(row['onset_sample'])}.jpg", mask)
+        #cv2.imwrite("temp_fig/mask.jpg", mask)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
 
-    abs_piezo_spec = np.abs(stftMat_mel)
-    log_piezo = np.abs(10 * np.log10(abs_piezo_spec))
-    
-    
-    normalized_image1 = spec2dB(stftMat_mel) # Piezo
-    
-    #cv2.imshow("mask_piezo", mask)
-    #cv2.imshow("test1",colormap1)
-    #cv2.imshow("test2",normalized_image1)
-    cv2.imwrite(f"spectrograms/{int(row['onset_sample'])}.jpg", normalized_image1)
-    #cv2.imwrite(f"mask/{int(row['onset_sample'])}.jpg", mask)
-    #cv2.imwrite("temp_fig/mask.jpg", mask)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+
+merged_df = pd.concat(df_list, ignore_index=True)
+merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
+merged_df.to_csv("meta.csv")
 #### ~0.27s for 255 frames. Try on your own
 # https://colab.research.google.com/github/enzokro/clck10/blob/master/_notebooks/2020-09-10-Normalizing-spectrograms-for-deep-learning.ipynb#scrollTo=wCB9ye5aEXBE
