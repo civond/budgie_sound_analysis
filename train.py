@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import numpy as np
-import os
 import torchvision.models as models
 from torchvision.transforms import v2
 
@@ -50,7 +49,6 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
 def main():
     # Load the model
     num_classes = 2
-
     model = models.efficientnet_b0(pretrained=True)
     model.classifier[1] = nn.Linear(1280, num_classes)
     model = model.to(DEVICE)
@@ -87,7 +85,7 @@ def main():
             PIN_MEMORY
         )
     
-    train = False
+    train = True
     test_loader = get_loader(
             TEST_COVID_IMG_DIR,
             TEST_NORM_IMG_DIR,
