@@ -100,19 +100,20 @@ for index, audio in enumerate(audio_paths):
                      header=None)
     
     df.rename(columns={0: 'onset', 1: 'offset', 2: 'label'}, inplace=True)
+    df['type'] = df['label'].apply(lambda x: 'voc' if x == 1 else 'noise')
+    print(df)
     df['onset_sample'] = (df['onset'] * fs).astype(int)
     df['offset_sample'] = (df['offset'] * fs).astype(int)
     df['length'] = df['offset_sample'] - df['onset_sample']
-    df['path'] = df['onset_sample'].astype(str).apply(lambda x: os.path.join(write_dir, audio_name+ '_' + x + '.jpg'))
+    
+    #df['path'] = df['onset_sample'].astype(str).apply(lambda x: os.path.join(write_dir,  df['type'].astype(str), audio_name+ '_' + x + '.jpg'))
+    df['path'] = df.apply(lambda row: os.path.join(write_dir, row['type'], f"{audio_name}_{row['onset_sample']}.jpg").replace('\\', '/'), axis=1)
     df['bird'] = str(audio_name)
 
     category_counts = df['label'].value_counts()
     print(category_counts)
-    #df = df[df['length'] >= 300]
-    #df = df[df['label'] == 2]
-    #df.reset_index(drop=True, inplace=True)
     df_list.append(df)
-
+    print(df)
 
     # Iterate across rows
     [y_piezo, fs] = load_filter_audio(audio_paths[index])
