@@ -14,14 +14,9 @@ LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
 NUM_EPOCHS = 10
-NUM_WORKERS = 12
+NUM_WORKERS = 15
 PIN_MEMORY = True
 LOAD_MODEL = False
-
-"""TRAIN_COVID_IMG_DIR = "spec/train_voc"
-TRAIN_NORM_IMG_DIR = "spec/train_noise"
-TEST_COVID_IMG_DIR = "spec/train_voc"
-TEST_NORM_IMG_DIR = "spec/train_noise"""
 
 dataset_pth = "meta.csv"
 
@@ -128,9 +123,10 @@ def main():
             "optimizer": optimizer.state_dict()
         }
         #save_checkpoint(checkpoint)
-        accuracy = check_accuracy(test_loader, 
-                                  model, 
-                                  device=DEVICE)
+        [acc, loss] = validate(test_loader, 
+                        model,
+                        loss_fn,
+                        device=DEVICE)
 
 if __name__ == "__main__":
     main()
