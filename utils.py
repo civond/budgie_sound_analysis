@@ -10,28 +10,21 @@ def load_checkpoint(checkpoint, model):
     print("-> Loading checkpoint.")
     model.load_state_dict(checkpoint["state_dict"])
     
-def get_loader(voc_dir,
-               noise_dir,
+def get_loader(dataframe,
                batch_size,
                transform,
                num_workers=12,
                train=True,
                pin_memory=True):
     
-    voc_ds = ImageDataset(
-        voc_dir, 
+    ds = ImageDataset(
+        dataframe, 
         train=train,
         transform=transform
         )
-    noise_ds = ImageDataset(
-        noise_dir, 
-        train=train,
-        transform=transform
-        )
-    train_dataset = ConcatDataset([voc_ds, noise_ds])
 
     loader = DataLoader(
-        train_dataset,
+        ds,
         batch_size=batch_size,
         num_workers=num_workers,
         pin_memory=pin_memory,

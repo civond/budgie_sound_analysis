@@ -78,16 +78,16 @@ def spec2dB(spec, show_img = False):
     return normalized_image#, colormap
 
 
-audio_paths = ["audio/Bl122.flac",
-            "audio/Li145.flac",
-            "audio/Or61.flac",
-            "audio/Ti81.flac"]
-label_paths = ["audio/Bl122.txt",
-            "audio/Li145.txt",
-            "audio/Or61.txt",
-            "audio/Ti81.txt"]
+audio_paths = ["data/Bl122.flac",
+            "data/Li145.flac",
+            "data/Or61.flac",
+            "data/Ti81.flac"]
+label_paths = ["data/Bl122.txt",
+            "data/Li145.txt",
+            "data/Or61.txt",
+            "data/Ti81.txt"]
 
-write_dir = "audio/"
+write_dir = "spec/"
 df_list = []
 
 for index, audio in enumerate(audio_paths):
@@ -153,9 +153,19 @@ for index, audio in enumerate(audio_paths):
         #cv2.waitKey(0)
         #cv2.destroyAllWindows()
 
-
+# Merge DFs
 merged_df = pd.concat(df_list, ignore_index=True)
 merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
-merged_df.to_csv("meta.csv")
+
+# Divide into fold
+merged_df['fold'] = pd.cut(merged_df.index, bins=5, labels=False)
+merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
+merged_df.loc[merged_df.index[-500:-1], 'fold'] = 10 # validation
+merged_df = merged_df .sort_values(by='fold')
+
+# Save merged df
+merged_df.to_csv("meta.csv", index=False)
+
+print(merged_df)
 #### ~0.27s for 255 frames. Try on your own
 # https://colab.research.google.com/github/enzokro/clck10/blob/master/_notebooks/2020-09-10-Normalizing-spectrograms-for-deep-learning.ipynb#scrollTo=wCB9ye5aEXBE

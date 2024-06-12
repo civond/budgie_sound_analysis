@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import torchvision.models as models
 from torchvision.transforms import v2
+import pandas as pd
 
 from utils import *
 
@@ -17,12 +18,12 @@ NUM_WORKERS = 12
 PIN_MEMORY = True
 LOAD_MODEL = False
 
-DATA_DIR = "Data/"
-
-TRAIN_COVID_IMG_DIR = "spec/train_voc"
+"""TRAIN_COVID_IMG_DIR = "spec/train_voc"
 TRAIN_NORM_IMG_DIR = "spec/train_noise"
 TEST_COVID_IMG_DIR = "spec/train_voc"
-TEST_NORM_IMG_DIR = "spec/train_noise"
+TEST_NORM_IMG_DIR = "spec/train_noise"""
+
+dataset_pth = "meta.csv"
 
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):
@@ -74,10 +75,28 @@ def main():
                     std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
                 )
         ])
+    
+    # Import dataset
+    df = pd.read_csv(dataset_pth)
+    df.replace({1: 0, 2: 1}, inplace=True) # Reformat
+    print(df)
+
+    # Train
+    train_df = df[df['fold'].isin([0,1,2,3])]
+    train_df.reset_index(drop=True, inplace=True)
+
+    # Test
+    test_df = df[df['fold'] == 4]
+    test_df.reset_index(drop=True, inplace=True)
+
+    # Valid
+    valid_df = df[df['fold'].isin([4,10])]
+    valid_df.reset_index(drop=True, inplace=True)
+
+    # Training
     train = True
     train_loader = get_loader(
-            TRAIN_COVID_IMG_DIR,
-            TRAIN_NORM_IMG_DIR,
+            train_df,
             BATCH_SIZE,
             train_transform,
             NUM_WORKERS,
@@ -85,10 +104,10 @@ def main():
             PIN_MEMORY
         )
     
-    train = True
+    # Validation
+    train = False
     test_loader = get_loader(
-            TEST_COVID_IMG_DIR,
-            TEST_NORM_IMG_DIR,
+            valid_df,
             BATCH_SIZE,
             test_transform,
             NUM_WORKERS,
@@ -108,12 +127,10 @@ def main():
             "state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict()
         }
-        save_checkpoint(checkpoint)
+        #save_checkpoint(checkpoint)
         accuracy = check_accuracy(test_loader, 
                                   model, 
                                   device=DEVICE)
-        
-        print(accuracy)
 
 if __name__ == "__main__":
     main()
