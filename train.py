@@ -13,7 +13,7 @@ from utils import *
 LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
-NUM_EPOCHS = 2
+NUM_EPOCHS = 10
 NUM_WORKERS = 8
 PIN_MEMORY = True
 LOAD_MODEL = False
@@ -58,16 +58,16 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
         # update tqdm loop
         loop.set_postfix(loss=loss.item())
         
-    avg_acc = np.array(total_acc / num_batches)
-    avg_loss = np.array(total_loss / num_batches)
+    avg_acc = total_acc / num_batches
+    avg_loss = total_loss / num_batches
     print(f"Train Avg_Acc: {avg_acc}, Avg_Loss: {avg_loss}")
     return avg_acc, avg_loss
 
 def main():
     # Load the model
     cross_valid_sets = [
-        #[4, [0,1,2,3]],
-        #[3, [0,1,2,4]],
+        [4, [0,1,2,3]],
+        [3, [0,1,2,4]],
         [2, [0,1,4,3]],
         [1, [0,4,2,3]],
         [0, [4,1,2,3]]
@@ -109,8 +109,8 @@ def main():
         
         # Import dataset
         df = pd.read_csv(dataset_pth)
-        df['label'].replace({1: 0, 2: 1}, inplace=True) # Reformat
-        #print(df)
+        #df['label'].replace({1: 0, 2: 1}, inplace=True)
+        df.replace({'label': {1: 0, 2: 1}}, inplace=True) # Reformat labels
 
         # Train
         train_df = df[df['fold'].isin(set[1])]
@@ -179,8 +179,11 @@ def main():
             val_running_loss.append(val_loss)
             val_running_acc.append(val_acc)
         
-        val_running_loss = val_running_loss
-        val_running_acc = val_running_acc
+        # Predict
+        print("Generating predictions")
+        preds = predict(test_loader, 
+                        model, 
+                        device=DEVICE)
         
         print(train_running_loss)
         print(train_running_acc)
@@ -192,11 +195,20 @@ def main():
             "val_loss" : val_running_loss,
             "val_acc" : val_running_acc
             }
+        
         #print(temp_data)
         temp_df = pd.DataFrame(temp_data)
-        print(temp_df)
-        print(f"Writing csv.")
-        temp_df.to_csv(f"csv/{set[0]}_valid.csv", sep=',', index=False)
+        temp_csv_path = f"csv/{set[0]}_valid.csv"
+        temp_preds_path = f"csv/{set[0]}_preds.csv"
         
+        print(f"\tWriting {temp_csv_path}")
+        temp_df.to_csv(temp_csv_path, sep=',', index=False)
+        
+        print(f"\tWriting {temp_preds_path}")
+        test_df['preds'] = preds
+        columns_to_keep = ['onset', 'offset', 'label', 'preds']
+        test_df = test_df.drop(df.columns.difference(columns_to_keep), axis=1)
+        test_df.to_csv(temp_preds_path, sep=',', index=False)
+    
 if __name__ == "__main__":
     main()

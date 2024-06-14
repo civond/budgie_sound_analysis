@@ -65,3 +65,19 @@ def validate(loader, model, loss_fn, device="cuda"):
     
     print(f"Validation Avg_Acc: {avg_acc}, Avg_Loss: {avg_loss}")
     return avg_acc, avg_loss.item()
+
+def predict(loader, model, device="cuda"):
+    preds = []
+    model.eval()
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images)
+            _, predicted_class = torch.max(outputs, 1)
+            preds.append(predicted_class.cpu().numpy())
+    preds = np.concatenate(preds)
+    print(preds)
+    print(len(preds))
+    return preds
