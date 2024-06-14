@@ -106,7 +106,6 @@ for index, audio in enumerate(audio_paths):
     df['offset_sample'] = (df['offset'] * fs).astype(int)
     df['length'] = df['offset_sample'] - df['onset_sample']
     
-    #df['path'] = df['onset_sample'].astype(str).apply(lambda x: os.path.join(write_dir,  df['type'].astype(str), audio_name+ '_' + x + '.jpg'))
     df['path'] = df.apply(lambda row: os.path.join(write_dir, row['type'], f"{audio_name}_{row['onset_sample']}.jpg").replace('\\', '/'), axis=1)
     df['bird'] = str(audio_name)
 
@@ -140,13 +139,13 @@ for index, audio in enumerate(audio_paths):
                         window='hann',
                         n_mels=225,
                         fmax=10000)
-        print(stftMat_mel.shape)
         
         normalized_image1 = spec2dB(stftMat_mel) # Piezo
         
         #cv2.imshow("mask_piezo", mask)
         #cv2.imshow("test1",colormap1)
         #cv2.imshow("test2",normalized_image1)
+        print(f"\tWriting: {row['path']}, {stftMat_mel.shape}")
         cv2.imwrite(row['path'], normalized_image1)
         #cv2.imwrite(f"mask/{int(row['onset_sample'])}.jpg", mask)
         #cv2.imwrite("temp_fig/mask.jpg", mask)
@@ -158,9 +157,20 @@ merged_df = pd.concat(df_list, ignore_index=True)
 merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
 
 # Divide into fold
-merged_df['fold'] = pd.cut(merged_df.index, bins=5, labels=False)
+merged_df['fold'] = pd.cut(merged_df.index, bins=5, labels=False) # 80:20 Train-Test split
 merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
-merged_df.loc[merged_df.index[-500:-1], 'fold'] = 10 # validation
+
+# Split Train set into train-valid sets
+df_train = merged_df[merged_df['fold'].isin([0,1,2,3])]
+df_train['fold'] = pd.cut(df_train.index, bins=5, labels=False)
+df_test = merged_df[merged_df['fold'] == 4]
+df_test['fold'] = 5
+
+df_list = []
+df_list.append(df_train)
+df_list.append(df_test)
+
+merged_df = pd.concat(df_list, ignore_index=True)
 merged_df = merged_df .sort_values(by='fold')
 
 # Save merged df

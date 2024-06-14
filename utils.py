@@ -36,11 +36,14 @@ def get_loader(dataframe,
 def validate(loader, model, loss_fn, device="cuda"):
     correct = 0
     total = 0
+    
+    total_loss = 0
+    total_acc = 0
     model.eval()
     
     with torch.no_grad():
         batch_length = len(loader)
-        total_loss = 0
+
 
         for images, labels in loader:
             images = images.to(device)
@@ -53,8 +56,12 @@ def validate(loader, model, loss_fn, device="cuda"):
 
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            accuracy = correct / total
-
-        avg_loss = total_loss / batch_length # Compute the average loss across batches
-    print(f"Validation Acc: {accuracy}, Avg_Loss: {avg_loss}")
-    return accuracy, avg_loss
+            
+            accuracy = (correct / total)
+            total_acc += accuracy
+        
+    avg_acc = total_acc / batch_length
+    avg_loss = total_loss / batch_length # Compute the average loss across batches
+    
+    print(f"Validation Avg_Acc: {avg_acc}, Avg_Loss: {avg_loss}")
+    return avg_acc, avg_loss.item()
