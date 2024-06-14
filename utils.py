@@ -80,7 +80,7 @@ def predict(loader, model, device="cuda"):
             preds_arr.append(predicted_class.cpu().numpy())
             labels_arr.append(labels)
     
-    preds = np.concatenate(preds)
-    print(preds)
-    print(len(preds))
-    return preds
+    preds_arr = np.concatenate(preds_arr)
+    print(preds_arr)
+    print(len(preds_arr))
+    return preds_arr, labels_arr

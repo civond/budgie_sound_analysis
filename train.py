@@ -181,7 +181,7 @@ def main():
         
         # Predict
         print("Generating predictions")
-        preds = predict(test_loader, 
+        preds, labels = predict(test_loader, 
                         model, 
                         device=DEVICE)
         
@@ -206,7 +206,9 @@ def main():
         
         print(f"\tWriting {temp_preds_path}")
         test_df['preds'] = preds
-        columns_to_keep = ['onset', 'offset', 'label', 'preds']
+        test_df['label2'] = labels
+        
+        columns_to_keep = ['onset', 'offset','label', 'preds', 'label2']
         test_df = test_df.drop(df.columns.difference(columns_to_keep), axis=1)
         test_df.to_csv(temp_preds_path, sep=',', index=False)
     
