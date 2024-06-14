@@ -67,16 +67,19 @@ def validate(loader, model, loss_fn, device="cuda"):
     return avg_acc, avg_loss.item()
 
 def predict(loader, model, device="cuda"):
-    preds = []
+    preds_arr = []
+    labels_arr = []
     model.eval()
     with torch.no_grad():
         for images, labels in loader:
             images = images.to(device)
-            labels = labels.to(device)
+            #labels = labels.to(device)
 
             outputs = model(images)
             _, predicted_class = torch.max(outputs, 1)
-            preds.append(predicted_class.cpu().numpy())
+            preds_arr.append(predicted_class.cpu().numpy())
+            labels_arr.append(labels)
+    
     preds = np.concatenate(preds)
     print(preds)
     print(len(preds))
