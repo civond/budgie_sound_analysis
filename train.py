@@ -13,8 +13,8 @@ from utils import *
 LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
-NUM_EPOCHS = 10
-NUM_WORKERS = 15
+NUM_EPOCHS = 2
+NUM_WORKERS = 8
 PIN_MEMORY = True
 LOAD_MODEL = False
 
@@ -23,10 +23,15 @@ dataset_pth = "meta.csv"
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):
     loop = tqdm(loader)
+    total_acc = 0
+    total_loss = 0
+    num_batches = len(loader)
     
     for batch_idx, (data, labels) in enumerate(loop):
         data = data.to(device=DEVICE)
         labels = labels.to(device=DEVICE)
+        total = 0
+        correct = 0
 
         # forward
         with torch.cuda.amp.autocast():
@@ -38,95 +43,160 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
+        
+        # Get loss
+        total_loss += loss.item()
+        _, predicted = torch.max(predictions, 1)
+
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        
+        accuracy = correct / total
+        total_acc += accuracy
+        
 
         # update tqdm loop
         loop.set_postfix(loss=loss.item())
+        
+    avg_acc = np.array(total_acc / num_batches)
+    avg_loss = np.array(total_loss / num_batches)
+    print(f"Train Avg_Acc: {avg_acc}, Avg_Loss: {avg_loss}")
+    return avg_acc, avg_loss
 
 def main():
     # Load the model
-    num_classes = 2
-    model = models.efficientnet_b0(pretrained=True)
-    model.classifier[1] = nn.Linear(1280, num_classes)
-    model = model.to(DEVICE)
-
-    loss_fn = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    scaler = torch.cuda.amp.GradScaler()
-
-    # Transforms
-    train_transform = v2.Compose([
-        v2.ToTensor(),
-        v2.RandomHorizontalFlip(p=0.5),
-        v2.Normalize(
-            mean=[0.4914, 0.4822, 0.4465],
-            std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
-        )
-        ])
+    cross_valid_sets = [
+        #[4, [0,1,2,3]],
+        #[3, [0,1,2,4]],
+        [2, [0,1,4,3]],
+        [1, [0,4,2,3]],
+        [0, [4,1,2,3]]
+    ]
     
-    test_transform = v2.Compose([
+    for set in cross_valid_sets:
+        train_running_loss = []
+        train_running_acc = []
+        val_running_loss = []
+        val_running_acc = []
+        
+        print(f"Running: {set[1]}, Valid: {set[0]}")
+        num_classes = 2
+        model = models.efficientnet_b0(pretrained=True)
+        model.classifier[1] = nn.Linear(1280, num_classes)
+        model = model.to(DEVICE)
+
+        loss_fn = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        scaler = torch.cuda.amp.GradScaler()
+
+        # Transforms
+        train_transform = v2.Compose([
             v2.ToTensor(),
+            v2.RandomHorizontalFlip(p=0.5),
             v2.Normalize(
-                    mean=[0.4914, 0.4822, 0.4465],
-                    std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
-                )
-        ])
-    
-    # Import dataset
-    df = pd.read_csv(dataset_pth)
-    df.replace({1: 0, 2: 1}, inplace=True) # Reformat
-    print(df)
+                mean=[0.4914, 0.4822, 0.4465],
+                std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
+            )
+            ])
+        
+        test_transform = v2.Compose([
+                v2.ToTensor(),
+                v2.Normalize(
+                        mean=[0.4914, 0.4822, 0.4465],
+                        std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
+                    )
+            ])
+        
+        # Import dataset
+        df = pd.read_csv(dataset_pth)
+        df['label'].replace({1: 0, 2: 1}, inplace=True) # Reformat
+        #print(df)
 
-    # Train
-    train_df = df[df['fold'].isin([0,1,2,3])]
-    train_df.reset_index(drop=True, inplace=True)
+        # Train
+        train_df = df[df['fold'].isin(set[1])]
+        train_df.reset_index(drop=True, inplace=True)
 
-    # Test
-    test_df = df[df['fold'] == 4]
-    test_df.reset_index(drop=True, inplace=True)
+        # Valid
+        valid_df = df[df['fold'] == int(set[0])]
+        valid_df.reset_index(drop=True, inplace=True)
+        
+        # Test
+        test_df = df[df['fold'] == 5]
+        test_df.reset_index(drop=True, inplace=True)
 
-    # Valid
-    valid_df = df[df['fold'].isin([4,10])]
-    valid_df.reset_index(drop=True, inplace=True)
-
-    # Training
-    train = True
-    train_loader = get_loader(
-            train_df,
-            BATCH_SIZE,
-            train_transform,
-            NUM_WORKERS,
-            train,
-            PIN_MEMORY
-        )
-    
-    # Validation
-    train = False
-    test_loader = get_loader(
-            valid_df,
-            BATCH_SIZE,
-            test_transform,
-            NUM_WORKERS,
-            train,
-            PIN_MEMORY
-        )
-    
-    if LOAD_MODEL: 
-        print("Loading model.")
-        load_checkpoint(torch.load("my_checkpoint.pth.tar"), model)
-    for epoch in range(NUM_EPOCHS):
-        print(f"\nEpoch: {epoch}")
-        train_fn(train_loader, model, optimizer, loss_fn, scaler)
-
-        # Save model
-        checkpoint = {
-            "state_dict": model.state_dict(),
-            "optimizer": optimizer.state_dict()
-        }
-        #save_checkpoint(checkpoint)
-        [acc, loss] = validate(test_loader, 
-                        model,
-                        loss_fn,
-                        device=DEVICE)
-
+        # Training
+        train = True
+        train_loader = get_loader(
+                train_df,
+                BATCH_SIZE,
+                train_transform,
+                NUM_WORKERS,
+                train,
+                PIN_MEMORY
+            )
+        
+        # Validation
+        train = False
+        valid_loader = get_loader(
+                valid_df,
+                BATCH_SIZE,
+                test_transform,
+                NUM_WORKERS,
+                train,
+                PIN_MEMORY
+            )
+        
+        # Test
+        train = False
+        test_loader = get_loader(
+                test_df,
+                BATCH_SIZE,
+                test_transform,
+                NUM_WORKERS,
+                train,
+                PIN_MEMORY
+            )
+        
+        if LOAD_MODEL: 
+            print("Loading model.")
+            load_checkpoint(torch.load("my_checkpoint.pth.tar"), model)
+        for epoch in range(NUM_EPOCHS):
+            print(f"\nEpoch: {epoch}")
+            [train_acc, train_loss] = train_fn(train_loader, model, optimizer, loss_fn, scaler)
+            # Save model
+            checkpoint = {
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict()
+            }
+            #save_checkpoint(checkpoint)
+            [val_acc, val_loss] = validate(valid_loader, 
+                            model,
+                            loss_fn,
+                            device=DEVICE)
+            
+            train_running_loss.append(train_loss)
+            train_running_acc.append(train_acc)
+            val_running_loss.append(val_loss)
+            val_running_acc.append(val_acc)
+        
+        val_running_loss = val_running_loss
+        val_running_acc = val_running_acc
+        
+        print(train_running_loss)
+        print(train_running_acc)
+        print(val_running_loss)
+        print(val_running_acc)
+        temp_data = {
+            "train_loss" : train_running_loss,
+            "train_acc" : train_running_acc, 
+            "val_loss" : val_running_loss,
+            "val_acc" : val_running_acc
+            }
+        #print(temp_data)
+        temp_df = pd.DataFrame(temp_data)
+        print(temp_df)
+        print(f"Writing csv.")
+        temp_df.to_csv(f"csv/{set[0]}_valid.csv", sep=',', index=False)
+        
 if __name__ == "__main__":
     main()
