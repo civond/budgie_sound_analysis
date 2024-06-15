@@ -10,10 +10,10 @@ import pandas as pd
 from utils import *
 
 # Hyperparameters
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
-NUM_EPOCHS = 10
+NUM_EPOCHS = 30
 NUM_WORKERS = 8
 PIN_MEMORY = True
 LOAD_MODEL = False
@@ -30,8 +30,7 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
     for batch_idx, (data, labels) in enumerate(loop):
         data = data.to(device=DEVICE)
         labels = labels.to(device=DEVICE)
-        total = 0
-        correct = 0
+        #print(f"Len Labels: {len(labels)}")
 
         # forward
         with torch.cuda.amp.autocast():
@@ -47,11 +46,19 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
         # Get loss
         total_loss += loss.item()
         _, predicted = torch.max(predictions, 1)
+        #print(f"Preds: {predicted}")
+        #print(f"labels: {labels}")
+        correct = (predicted == labels).sum().item()
+        #print(correct)
+        """total += labels.size(0)
+        correct += (predicted == labels).sum().item()"""
 
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+        #print((predicted == labels))
+    
+        #print(total)
         
-        accuracy = correct / total
+        accuracy = correct / len(labels)
+        #print(accuracy)
         total_acc += accuracy
         
 
@@ -81,7 +88,7 @@ def main():
         
         print(f"Running: {set[1]}, Valid: {set[0]}")
         num_classes = 2
-        model = models.efficientnet_b0(pretrained=True)
+        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
         model.classifier[1] = nn.Linear(1280, num_classes)
         model = model.to(DEVICE)
 
@@ -126,12 +133,15 @@ def main():
 
         # Training
         train = True
+        shuffle=False
+
         train_loader = get_loader(
                 train_df,
                 BATCH_SIZE,
                 train_transform,
                 NUM_WORKERS,
                 train,
+                shuffle,
                 PIN_MEMORY
             )
         
@@ -143,17 +153,20 @@ def main():
                 test_transform,
                 NUM_WORKERS,
                 train,
+                shuffle,
                 PIN_MEMORY
             )
         
         # Test
         train = False
+        shuffle=False
         test_loader = get_loader(
                 test_df,
                 BATCH_SIZE,
                 test_transform,
                 NUM_WORKERS,
                 train,
+                shuffle,
                 PIN_MEMORY
             )
         
@@ -185,10 +198,6 @@ def main():
                         model, 
                         device=DEVICE)
         
-        print(train_running_loss)
-        print(train_running_acc)
-        print(val_running_loss)
-        print(val_running_acc)
         temp_data = {
             "train_loss" : train_running_loss,
             "train_acc" : train_running_acc, 
@@ -208,9 +217,9 @@ def main():
         test_df['preds'] = preds
         test_df['label2'] = labels
         
-        columns_to_keep = ['onset', 'offset','label', 'preds', 'label2']
+        columns_to_keep = ['onset', 'offset','label', 'preds']
         test_df = test_df.drop(df.columns.difference(columns_to_keep), axis=1)
         test_df.to_csv(temp_preds_path, sep=',', index=False)
-    
+
 if __name__ == "__main__":
     main()

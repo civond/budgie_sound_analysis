@@ -15,6 +15,7 @@ def get_loader(dataframe,
                transform,
                num_workers=12,
                train=True,
+               shuffle=False,
                pin_memory=True):
     
     ds = ImageDataset(
@@ -26,17 +27,14 @@ def get_loader(dataframe,
     loader = DataLoader(
         ds,
         batch_size=batch_size,
+        shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        shuffle=True
     )
 
     return loader
 
 def validate(loader, model, loss_fn, device="cuda"):
-    correct = 0
-    total = 0
-    
     total_loss = 0
     total_acc = 0
     model.eval()
@@ -54,10 +52,9 @@ def validate(loader, model, loss_fn, device="cuda"):
 
             _, predicted = torch.max(outputs, 1)
 
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-            
-            accuracy = (correct / total)
+            correct = (predicted == labels).sum().item()
+            accuracy = (correct / len(labels))
+            #print(accuracy)
             total_acc += accuracy
         
     avg_acc = total_acc / batch_length
@@ -79,8 +76,11 @@ def predict(loader, model, device="cuda"):
             _, predicted_class = torch.max(outputs, 1)
             preds_arr.append(predicted_class.cpu().numpy())
             labels_arr.append(labels)
-    
+
+            #print(f"Labels: {labels}")
+            #print(f"Preds: {predicted_class}")
     preds_arr = np.concatenate(preds_arr)
-    print(preds_arr)
-    print(len(preds_arr))
+    labels_arr = np.concatenate(labels_arr)
+    #print(preds_arr)
+    #print(len(preds_arr))
     return preds_arr, labels_arr

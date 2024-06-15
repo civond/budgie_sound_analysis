@@ -13,7 +13,7 @@ from utils import *
 LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
-NUM_EPOCHS = 2
+NUM_EPOCHS = 1
 NUM_WORKERS = 8
 PIN_MEMORY = True
 LOAD_MODEL = False
@@ -31,6 +31,7 @@ def main():
 
     # Test
     train = False
+    shuffle=False
     test_transform = v2.Compose([
                     v2.ToTensor(),
                     v2.Normalize(
@@ -45,20 +46,22 @@ def main():
             test_transform,
             NUM_WORKERS,
             train,
+            shuffle,
             PIN_MEMORY
         )
+
     num_classes = 2
-    model = models.efficientnet_b0(pretrained=True)
+    model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
     model.classifier[1] = nn.Linear(1280, num_classes)
     model = model.to(DEVICE)
 
 
     print("Generating predictions")
-    preds = predict(test_loader, 
+    preds, labels = predict(test_loader, 
                     model, 
                     device=DEVICE)
-    
     test_df['preds'] = preds
+    test_df['label2'] = labels
     temp_preds_path = f"csv/test_preds.csv"
     print(f"Writing {temp_preds_path}")
     test_df.to_csv(temp_preds_path, sep=',', index=False)
