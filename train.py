@@ -13,7 +13,7 @@ from utils import *
 LEARNING_RATE = 1e-5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
-NUM_EPOCHS = 30
+NUM_EPOCHS = 15
 NUM_WORKERS = 8
 PIN_MEMORY = True
 LOAD_MODEL = False
@@ -116,7 +116,6 @@ def main():
         
         # Import dataset
         df = pd.read_csv(dataset_pth)
-        #df['label'].replace({1: 0, 2: 1}, inplace=True)
         df.replace({'label': {1: 0, 2: 1}}, inplace=True) # Reformat labels
 
         # Train
