@@ -21,7 +21,7 @@ def load_filter_audio(path):
 # Create Spectrogram
 def gen_spec(audio, fs):
      stftMat = lr.stft(audio, 
-                    n_fft= 512, 
+                    n_fft= 1024, 
                     win_length=int(fs*0.008),
                     hop_length=int(fs*0.001), 
                     center=True, 
@@ -46,6 +46,7 @@ def apply_mask(stftMat, mask, fs):
     S_masked = real_masked + 1j * imag_masked
 
     iStftMat = lr.istft(S_masked, 
+                        n_fft=1024,
                         win_length= int(fs*0.008),
                         hop_length= int(fs*0.001), 
                         window='hann')

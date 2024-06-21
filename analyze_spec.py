@@ -9,11 +9,21 @@ import cv2
 from spec_utilities import *
 
 # Load Audio
-[y_piezo, fs] = load_filter_audio('data/bl122_piezo.flac')
+"""[y_piezo, fs] = load_filter_audio('data/bl122_piezo.flac')
 [y_amb, fs] = load_filter_audio('data/bl122_amb.flac')
 
 # Create Dataset
-df = pd.read_csv('data/bl122_short.txt', sep='\t', header=None)
+df = pd.read_csv('data/bl122_short.txt', sep='\t', header=None)"""
+
+# Load Audio
+#[y_piezo, fs] = load_filter_audio('data/audioCh3_short_filtered.flac')
+#[y_amb, fs] = load_filter_audio('data/audioCh1_short_filtered.flac')
+[y_piezo, fs] = lr.load('data/audioCh3_short_filtered.flac', sr=None)
+[y_amb, fs] = lr.load('data/audioCh1_short_filtered.flac', sr=None)
+
+# Create Dataset
+df = pd.read_csv('data/audioCh3_short_filtered_labels.txt', sep='\t', header=None)
+
 df.rename(columns={0: 'onset', 1: 'offset', 2: 'label'}, inplace=True)
 df['onset_sample'] = (df['onset'] * fs).astype(int)
 df['offset_sample'] = (df['offset'] * fs).astype(int)
@@ -40,7 +50,7 @@ for index, row in df.iterrows():
     # Create mask and apply binary thresholding
     abs_piezo_spec = np.abs(stftMat)**2
     log_piezo = np.abs(10 * np.log10(abs_piezo_spec))
-    threshold_value = 30
+    threshold_value = 45
     _, mask = cv2.threshold(log_piezo, threshold_value, 255, cv2.THRESH_BINARY)
     mask = 255 - mask
     mask = cv2.inRange(mask, 254, 255)
@@ -65,9 +75,9 @@ for index, row in df.iterrows():
     # Plotting
     plt.figure(1, figsize=(3,5))
     plt.subplot(3,1,1)
-    plt.plot(t, piezo_temp, color='g', linewidth=1)
-    plt.plot(t, iStftMat, color='b', linewidth=1)
-    plt.plot(t, iStftMat2, color='r',linewidth=1)
+    #plt.plot(t, piezo_temp, color='g', linewidth=1)
+    plt.plot(iStftMat, color='b', linewidth=1)
+    plt.plot(iStftMat2, color='r',linewidth=1)
     #plt.legend(['Orig','Piezo', 'Amb'], fontsize=8)
     plt.title(f"ISTFT Masked. Corr: {np.round(corr_val[0],4)}")
     plt.grid(True)

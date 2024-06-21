@@ -78,16 +78,19 @@ def spec2dB(spec, show_img = False):
     return normalized_image#, colormap
 
 
-audio_paths = ["data/Bl122.flac",
+"""audio_paths = ["data/Bl122.flac",
             "data/Li145.flac",
             "data/Or61.flac",
             "data/Ti81.flac"]
 label_paths = ["data/Bl122.txt",
             "data/Li145.txt",
             "data/Or61.txt",
-            "data/Ti81.txt"]
+            "data/Ti81.txt"]"""
 
-write_dir = "spec/"
+audio_paths = ['data/Bl122.flac']
+label_paths = ['data/Bl122_unseen.txt']
+
+write_dir = "spec2/"
 df_list = []
 
 for index, audio in enumerate(audio_paths):
@@ -140,7 +143,7 @@ for index, audio in enumerate(audio_paths):
                         window='hann',
                         n_mels=225,
                         fmax=10000)
-        print(stftMat_mel.shape)
+        print(f"\tWriting: {row['path']}, {stftMat_mel.shape}")
         
         normalized_image1 = spec2dB(stftMat_mel) # Piezo
         
@@ -160,11 +163,11 @@ merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
 # Divide into fold
 merged_df['fold'] = pd.cut(merged_df.index, bins=5, labels=False)
 merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
-merged_df.loc[merged_df.index[-500:-1], 'fold'] = 10 # validation
+#merged_df.loc[merged_df.index[-500:-1], 'fold'] = 10 # validation
 merged_df = merged_df .sort_values(by='fold')
 
 # Save merged df
-merged_df.to_csv("meta.csv", index=False)
+merged_df.to_csv("meta_unseen.csv", index=False)
 
 
 print(merged_df)

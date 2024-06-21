@@ -72,153 +72,126 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
 
 def main():
     # Load the model
-    cross_valid_sets = [
-        [4, [0,1,2,3]],
-        [3, [0,1,2,4]],
-        [2, [0,1,4,3]],
-        [1, [0,4,2,3]],
-        [0, [4,1,2,3]]
-    ]
+    num_classes = 2
+    model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
+    model.classifier[1] = nn.Linear(1280, num_classes)
+    model = model.to(DEVICE)
+
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    scaler = torch.cuda.amp.GradScaler()
+
+    # Transforms
+    train_transform = v2.Compose([
+        v2.ToTensor(),
+        v2.RandomHorizontalFlip(p=0.5),
+        v2.Normalize(
+            mean=[0.4914, 0.4822, 0.4465],
+            std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
+        )
+        ])
     
-    for set in cross_valid_sets:
-        train_running_loss = []
-        train_running_acc = []
-        val_running_loss = []
-        val_running_acc = []
-        
-        print(f"Running: {set[1]}, Valid: {set[0]}")
-        num_classes = 2
-        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
-        model.classifier[1] = nn.Linear(1280, num_classes)
-        model = model.to(DEVICE)
-
-        loss_fn = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-        scaler = torch.cuda.amp.GradScaler()
-
-        # Transforms
-        train_transform = v2.Compose([
+    test_transform = v2.Compose([
             v2.ToTensor(),
-            v2.RandomHorizontalFlip(p=0.5),
             v2.Normalize(
-                mean=[0.4914, 0.4822, 0.4465],
-                std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
-            )
-            ])
-        
-        test_transform = v2.Compose([
-                v2.ToTensor(),
-                v2.Normalize(
-                        mean=[0.4914, 0.4822, 0.4465],
-                        std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
-                    )
-            ])
-        
-        # Import dataset
-        df = pd.read_csv(dataset_pth)
-        df.replace({'label': {1: 0, 2: 1}}, inplace=True) # Reformat labels
+                    mean=[0.4914, 0.4822, 0.4465],
+                    std= np.sqrt([1.0, 1.0, 1.0]) # variance is std**2
+                )
+        ])
+    
+    # Import dataset
+    df = pd.read_csv(dataset_pth)
+    df.replace({'label': {1: 0, 2: 1}}, inplace=True) # Reformat labels
 
-        # Train
-        train_df = df[df['fold'].isin(set[1])]
-        train_df.reset_index(drop=True, inplace=True)
+    df_predict = pd.read_csv("meta_unseen.csv")
 
-        # Valid
-        valid_df = df[df['fold'] == int(set[0])]
-        valid_df.reset_index(drop=True, inplace=True)
-        
-        # Test
-        test_df = df[df['fold'] == 5]
-        test_df.reset_index(drop=True, inplace=True)
+    # Train
+    train_df = df[df['fold'].isin([0,1,2,3,5])]
+    train_df.reset_index(drop=True, inplace=True)
 
-        # Training
-        train = True
-        shuffle=False
+    # Valid
+    valid_df = df[df['fold'] == 4]
+    valid_df.reset_index(drop=True, inplace=True)
+    
+    # Test
+    test_df = df_predict[df_predict['fold'].isin([0,1,2,3,4,10])]
+    test_df.reset_index(drop=True, inplace=True)
 
-        train_loader = get_loader(
-                train_df,
-                BATCH_SIZE,
-                train_transform,
-                NUM_WORKERS,
-                train,
-                shuffle,
-                PIN_MEMORY
-            )
-        
-        # Validation
-        train = False
-        valid_loader = get_loader(
-                valid_df,
-                BATCH_SIZE,
-                test_transform,
-                NUM_WORKERS,
-                train,
-                shuffle,
-                PIN_MEMORY
-            )
-        
-        # Test
-        train = False
-        shuffle=False
-        test_loader = get_loader(
-                test_df,
-                BATCH_SIZE,
-                test_transform,
-                NUM_WORKERS,
-                train,
-                shuffle,
-                PIN_MEMORY
-            )
-        
-        if LOAD_MODEL: 
-            print("Loading model.")
-            load_checkpoint(torch.load("my_checkpoint.pth.tar"), model)
-        for epoch in range(NUM_EPOCHS):
-            print(f"\nEpoch: {epoch}")
-            [train_acc, train_loss] = train_fn(train_loader, model, optimizer, loss_fn, scaler)
-            # Save model
-            checkpoint = {
-                "state_dict": model.state_dict(),
-                "optimizer": optimizer.state_dict()
-            }
-            #save_checkpoint(checkpoint)
-            [val_acc, val_loss] = validate(valid_loader, 
-                            model,
-                            loss_fn,
-                            device=DEVICE)
-            
-            train_running_loss.append(train_loss)
-            train_running_acc.append(train_acc)
-            val_running_loss.append(val_loss)
-            val_running_acc.append(val_acc)
-        
-        # Predict
-        print("Generating predictions")
-        preds, labels = predict(test_loader, 
-                        model, 
+    # Training
+    train = True
+    shuffle=False
+
+    train_loader = get_loader(
+            train_df,
+            BATCH_SIZE,
+            train_transform,
+            NUM_WORKERS,
+            train,
+            shuffle,
+            PIN_MEMORY
+        )
+    
+    # Validation
+    train = False
+    valid_loader = get_loader(
+            valid_df,
+            BATCH_SIZE,
+            test_transform,
+            NUM_WORKERS,
+            train,
+            shuffle,
+            PIN_MEMORY
+        )
+    
+    # Test
+    train = False
+    shuffle=False
+    test_loader = get_loader(
+            test_df,
+            BATCH_SIZE,
+            test_transform,
+            NUM_WORKERS,
+            train,
+            shuffle,
+            PIN_MEMORY
+        )
+    
+    if LOAD_MODEL: 
+        print("Loading model.")
+        load_checkpoint(torch.load("my_checkpoint.pth.tar"), model)
+    for epoch in range(NUM_EPOCHS):
+        print(f"\nEpoch: {epoch}")
+        [train_acc, train_loss] = train_fn(train_loader, 
+                                           model, 
+                                           optimizer, 
+                                           loss_fn, 
+                                           scaler)
+        # Save model
+        checkpoint = {
+            "state_dict": model.state_dict(),
+            "optimizer": optimizer.state_dict()
+        }
+        #save_checkpoint(checkpoint)
+        [val_acc, val_loss] = validate(valid_loader, 
+                        model,
+                        loss_fn,
                         device=DEVICE)
-        
-        temp_data = {
-            "train_loss" : train_running_loss,
-            "train_acc" : train_running_acc, 
-            "val_loss" : val_running_loss,
-            "val_acc" : val_running_acc
-            }
-        
-        #print(temp_data)
-        temp_df = pd.DataFrame(temp_data)
-        temp_csv_path = f"csv/{set[0]}_valid.csv"
-        temp_preds_path = f"csv/{set[0]}_preds.csv"
-        
-        print(f"\tWriting {temp_csv_path}")
-        temp_df.to_csv(temp_csv_path, sep=',', index=False)
-        
-        print(f"\tWriting {temp_preds_path}")
-        test_df['preds'] = preds
-        test_df['label2'] = labels
-        
-        columns_to_keep = ['onset', 'offset','label', 'preds']
-        test_df = test_df.drop(df.columns.difference(columns_to_keep), axis=1)
-        test_df.to_csv(temp_preds_path, sep=',', index=False)
+    
+    # Predict
+    print("Generating predictions")
+    preds, labels = predict(test_loader, 
+                    model, 
+                    device=DEVICE)
+    
+    #print(temp_data)
+    temp_preds_path = f"csv/bl122_unseen_preds.csv"
+    
+    print(f"\tWriting {temp_preds_path}")
+    test_df['preds'] = preds
+    
+    columns_to_keep = ['onset', 'offset','label', 'preds', 'bird']
+    test_df = test_df.drop(test_df.columns.difference(columns_to_keep), axis=1)
+    test_df.to_csv(temp_preds_path, sep=',', index=False)
 
 if __name__ == "__main__":
     main()
