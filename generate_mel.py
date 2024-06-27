@@ -19,15 +19,51 @@ def load_filter_audio(path):
     return [y, fs]
 
 # Convert spectrogramn to dB and rotate 180 degrees
-def spec2dB(spec, show_img = False):
+def spec2dB(spec, spec2, mask, show_img = False):
+
+    # Piezo Spectrogram
     db = lr.amplitude_to_db(np.abs(spec), ref=np.max)
+    #db = db**2 # originally no squaring
     normalized_image = cv2.normalize(db, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U) # Normalize
     normalized_image = cv2.rotate(normalized_image, cv2.ROTATE_180) # Rotate 180 degrees
     normalized_image = cv2.flip(normalized_image, 1) # Flip horizontally
 
-    # CLAHE
     clahe = cv2.createCLAHE(clipLimit=3, tileGridSize=(8,8))
     normalized_image = clahe.apply(normalized_image)
+
+    # Amb Spectrogram
+    db2 = lr.amplitude_to_db(np.abs(spec2), ref=np.max)
+    db2 = db2 # originally no squaring
+    normalized_image2 = cv2.normalize(db2, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U) # Normalize
+    normalized_image2 = clahe.apply(normalized_image2)
+
+    normalized_image2 = cv2.bitwise_and(normalized_image2, 
+                                  normalized_image2, 
+                                  mask=mask)
+    normalized_image2 = cv2.rotate(normalized_image2, cv2.ROTATE_180) # Rotate 180 degrees
+    normalized_image2 = cv2.flip(normalized_image2, 1) # Flip horizontally
+
+    # CLAHE
+
+    #norm2color = cv2.cvtColor(normalized_image, cv2.COLOR_GRAY2BGR)
+
+    # I inputted this to test inputting into color channels
+    rgb_image = np.zeros((normalized_image.shape[0], 
+                          normalized_image.shape[1], 
+                          3), dtype=np.uint8)
+    
+    rgb_image[:, :, 0] = normalized_image
+    rgb_image[:, :, 1] = normalized_image2
+
+    """cv2.imshow("B/G", rgb_image)
+    cv2.imshow("Piezo", rgb_image[:, :, 0])
+    cv2.imshow("Masked amb (G)", rgb_image[:, :, 1])
+    cv2.imshow("Mask", mask)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()"""
+
+    #print(normalized_image)
+    #print(norm2color)
     
 
     """
@@ -75,25 +111,40 @@ def spec2dB(spec, show_img = False):
         cv2.imshow("piezo", normalized_image)#, colormap)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-    return normalized_image#, colormap
 
+    return rgb_image
 
-"""audio_paths = ["data/Bl122.flac",
+piezo_audio_paths = ["data/audioCh3_short_filtered.flac",
+                     "data/audioCh4_short_filtered.flac"]
+amb_audio_paths = ["data/audioCh1_short_filtered.flac",
+                   "data/audioCh2_short_filtered.flac"]
+label_paths = ["data/audioCh3_short_filtered.txt",
+               "data/audioCh4_short_filtered.txt"]
+
+"""piezo_audio_paths = ["data/Bl122.flac",
             "data/Li145.flac",
             "data/Or61.flac",
             "data/Ti81.flac"]
+
+amb_audio_paths = ["data/Bl122_Ambient.flac",
+            "data/Li145_Ambient.flac",
+            "data/Or61_Ambient.flac",
+            "data/Ti81_Ambient.flac"]
+
 label_paths = ["data/Bl122.txt",
             "data/Li145.txt",
             "data/Or61.txt",
             "data/Ti81.txt"]"""
 
-audio_paths = ['data/Bl122.flac']
-label_paths = ['data/Bl122_unseen.txt']
+"""piezo_audio_paths = ['data/Bl122.flac']
+amb_audio_paths = ['data/Bl122_Ambient.flac']
 
-write_dir = "spec2/"
+label_paths = ['data/Bl122_unseen.txt']"""
+
+write_dir = "spec_twobird/"
 df_list = []
 
-for index, audio in enumerate(audio_paths):
+for index, audio in enumerate(piezo_audio_paths):
     audio_name = audio.split('/')[1].split(".")[0]
 
     # Create Dataset
@@ -119,18 +170,26 @@ for index, audio in enumerate(audio_paths):
     print(df)
 
     # Iterate across rows
-    [y_piezo, fs] = load_filter_audio(audio_paths[index])
+    [y_piezo, fs] = load_filter_audio(piezo_audio_paths[index])
+    [y_amb, fs] = load_filter_audio(amb_audio_paths[index])
+
     for index, row in df.iterrows():
         start = int(row['onset_sample'])
         end = int(row['offset_sample'])
 
         piezo_temp = y_piezo[start:end]
-        temp = np.zeros(int(fs*0.255))
+        amb_temp = y_amb[start:end]
+
+        #temp = np.zeros(int(fs*0.255))
+        #temp[0:len(piezo_temp)] = piezo_temp
 
         # Tiling the audio
         [mul, rem] = np.divmod(fs*0.254,len(piezo_temp))
         piezo_temp = np.tile(piezo_temp, int(mul+1))
         piezo_temp = piezo_temp[0:int(fs*0.224)]
+
+        amb_temp = np.tile(amb_temp, int(mul+1))
+        amb_temp = amb_temp[0:int(fs*0.224)]
 
         # Create Mel Spectrogram
         stftMat_mel = lr.feature.melspectrogram(
@@ -143,13 +202,35 @@ for index, audio in enumerate(audio_paths):
                         window='hann',
                         n_mels=225,
                         fmax=10000)
+        # Ambient
+        stftMat_mel2 = lr.feature.melspectrogram(
+                        y = amb_temp, 
+                        sr=fs,
+                        n_fft=2048, 
+                        win_length=int(fs*0.008),
+                        hop_length=int(fs*0.001), 
+                        center=True, 
+                        window='hann',
+                        n_mels=225,
+                        fmax=10000)
+        
+        # Create mask and apply binary thresholding
+        abs_piezo_spec = np.abs(stftMat_mel)**2
+        log_piezo = np.abs(10 * np.log10(abs_piezo_spec))
+        threshold_value = 60
+        _, mask = cv2.threshold(log_piezo, threshold_value, 255, cv2.THRESH_BINARY)
+        mask = 255 - mask
+        mask = cv2.inRange(mask, 254, 255)
+
         print(f"\tWriting: {row['path']}, {stftMat_mel.shape}")
         
-        normalized_image1 = spec2dB(stftMat_mel) # Piezo
+        # Originally there was no squaring.
+        normalized_image1 = spec2dB(stftMat_mel, stftMat_mel2, mask) # Piezo
         
         #cv2.imshow("mask_piezo", mask)
         #cv2.imshow("test1",colormap1)
         #cv2.imshow("test2",normalized_image1)
+
         cv2.imwrite(row['path'], normalized_image1)
         #cv2.imwrite(f"mask/{int(row['onset_sample'])}.jpg", mask)
         #cv2.imwrite("temp_fig/mask.jpg", mask)
@@ -163,11 +244,11 @@ merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
 # Divide into fold
 merged_df['fold'] = pd.cut(merged_df.index, bins=5, labels=False)
 merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
-#merged_df.loc[merged_df.index[-500:-1], 'fold'] = 10 # validation
-merged_df = merged_df .sort_values(by='fold')
+
+merged_df = merged_df.sort_values(by='fold')
 
 # Save merged df
-merged_df.to_csv("meta_unseen.csv", index=False)
+merged_df.to_csv("meta_twobird.csv", index=False)
 
 
 print(merged_df)

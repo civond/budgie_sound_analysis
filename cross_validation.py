@@ -14,11 +14,11 @@ LEARNING_RATE = 1e-5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 128
 NUM_EPOCHS = 15
-NUM_WORKERS = 8
+NUM_WORKERS = 12
 PIN_MEMORY = True
 LOAD_MODEL = False
 
-dataset_pth = "meta.csv"
+dataset_pth = "meta_color3.csv"
 
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):
@@ -206,8 +206,8 @@ def main():
         
         #print(temp_data)
         temp_df = pd.DataFrame(temp_data)
-        temp_csv_path = f"csv/{set[0]}_valid.csv"
-        temp_preds_path = f"csv/{set[0]}_preds.csv"
+        temp_csv_path = f"csv/{set[0]}_color_valid2.csv"
+        temp_preds_path = f"csv/{set[0]}_color_preds2.csv"
         
         print(f"\tWriting {temp_csv_path}")
         temp_df.to_csv(temp_csv_path, sep=',', index=False)

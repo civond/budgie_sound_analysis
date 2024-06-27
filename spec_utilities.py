@@ -64,6 +64,7 @@ def spec2dB(spec, show_img = False):
     colormap = cv2.applyColorMap(normalized_image, cv2.COLORMAP_JET) # Apply colormap
     if show_img == True:
             cv2.imshow("piezo", colormap)
+            
     return normalized_image, colormap, temp
 
 # Root Mean Square Error

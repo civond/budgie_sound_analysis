@@ -166,16 +166,18 @@ def main():
                                            optimizer, 
                                            loss_fn, 
                                            scaler)
-        # Save model
-        checkpoint = {
-            "state_dict": model.state_dict(),
-            "optimizer": optimizer.state_dict()
-        }
-        #save_checkpoint(checkpoint)
+    
         [val_acc, val_loss] = validate(valid_loader, 
                         model,
                         loss_fn,
                         device=DEVICE)
+    
+    # Save model
+    checkpoint = {
+        "state_dict": model.state_dict(),
+        "optimizer": optimizer.state_dict()
+    }
+    save_checkpoint(state = checkpoint, filename= "state.pth.tar")
     
     # Predict
     print("Generating predictions")

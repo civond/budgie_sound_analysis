@@ -19,13 +19,13 @@ df = pd.read_csv('data/bl122_short.txt', sep='\t', header=None)"""
 # Load Audio
 #[y_piezo, fs] = load_filter_audio('data/audioCh3_short_filtered.flac')
 #[y_amb, fs] = load_filter_audio('data/audioCh1_short_filtered.flac')
-[y_piezo, fs] = lr.load('data/audioCh3_short_filtered.flac', sr=None)
-[y_amb, fs] = lr.load('data/audioCh1_short_filtered.flac', sr=None)
+[y_piezo, fs] = lr.load('data/audioCh4_short_filtered.flac', sr=None)
+[y_amb, fs] = lr.load('data/audioCh2_short_filtered.flac', sr=None)
 
 write_fig = False
 
 # Create Dataset
-df = pd.read_csv('data/audioCh3_short_filtered.txt', sep='\t', header=None)
+df = pd.read_csv('data/audioCh4_short_filtered.txt', sep='\t', header=None)
 df.rename(columns={0: 'onset', 1: 'offset', 2: 'label'}, inplace=True)
 df['onset_sample'] = (df['onset'] * fs).astype(int)
 df['offset_sample'] = (df['offset'] * fs).astype(int)
@@ -125,10 +125,8 @@ for index, row in df.iterrows():
     sum1 = np.sum(f1)/2
     sum2 = np.sum(f2)/2
 
-    if sum2*8 < sum1:
+    if sum2*6 < sum1:
         rows_to_drop_fft.append(index)
-
-    print(sum1, sum2)
 
     if write_fig == True:
         temp_write = os.path.join(write_dir, str(int(row['onset_sample'])))
@@ -145,7 +143,8 @@ for index, row in df.iterrows():
         plt.plot(freqs, f1, color='b')
         plt.plot(freqs, f2, color='r')
         plt.xlim(0,fs/2)
-        plt.title("FFT")
+        #plt.title("FFT")
+        plt.title(f"Piezo: {np.round(sum1,2)}, Amb: {np.round(sum2,2)}")
         plt.ylabel('Mag.')
         plt.grid(True)
         plt.xlabel('Frequency (Hz)')
@@ -196,7 +195,6 @@ for index, row in df.iterrows():
         plt.tight_layout()
 
         plt.savefig(os.path.join(temp_write,"figure.png"))
-        plt.show()
         plt.clf()
             
         #cv2.waitKey(0)
@@ -210,7 +208,7 @@ print(f"After drop: {len(df_dropped_rmse)}")
 
 columns_to_keep = ['onset', 'offset', 'label']
 df_dropped_rmse = df_dropped_rmse.loc[:, columns_to_keep]
-df_dropped_rmse.to_csv("dropped_rmse.txt", sep='\t', header=False, index=False)
+df_dropped_rmse.to_csv("dropped_rmse2.txt", sep='\t', header=False, index=False)
 
 # FFT
 print(f"Before drop: {len(df)}")
@@ -220,4 +218,4 @@ print(f"After drop: {len(df_dropped_fft)}")
 
 columns_to_keep = ['onset', 'offset', 'label']
 df_dropped_fft = df_dropped_fft.loc[:, columns_to_keep]
-df_dropped_fft.to_csv("dropped_fft.txt", sep='\t', header=False, index=False)
+df_dropped_fft.to_csv("dropped_fft2.txt", sep='\t', header=False, index=False)

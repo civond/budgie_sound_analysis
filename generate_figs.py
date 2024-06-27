@@ -5,17 +5,17 @@ import seaborn as sns
 import pandas as pd
 
 # .csv paths
-pred_paths = ["csv/0_preds.csv",
-              "csv/1_preds.csv",
-              "csv/2_preds.csv",
-              "csv/3_preds.csv",
-              "csv/4_preds.csv"]
+pred_paths = ["csv/0_color_preds2.csv",
+              "csv/1_color_preds2.csv",
+              "csv/2_color_preds2.csv",
+              "csv/3_color_preds2.csv",
+              "csv/4_color_preds2.csv"]
 
-valid_paths = ["csv/0_valid.csv",
-              "csv/1_valid.csv",
-              "csv/2_valid.csv",
-              "csv/3_valid.csv",
-              "csv/4_valid.csv"]
+valid_paths = ["csv/0_color_valid2.csv",
+              "csv/1_color_valid2.csv",
+              "csv/2_color_valid2.csv",
+              "csv/3_color_valid2.csv",
+              "csv/4_color_valid2.csv"]
 
 # pred stats
 i = 0
@@ -40,7 +40,7 @@ for path in pred_paths:
     plt.title(f"acc. = {np.round(acc,4)}")
     i+=1
 plt.tight_layout()
-plt.savefig("csv/cm.png")
+plt.savefig("csv/cm_color.png")
 
 # epoch stats
 plt.figure(1, figsize=(6,5))
@@ -66,6 +66,7 @@ plt.xlabel('Epoch')
 plt.ylabel("Loss")
 plt.grid(True)
 plt.xlim(0,14)
+plt.ylim(0,0.65)
 
 plt.subplot(2,2,2)
 plt.title("Train Acc.")
@@ -75,13 +76,13 @@ plt.grid(True)
 plt.xlim(0,14)
 plt.ylim(0.65,1)
 
-
 plt.subplot(2,2,3)
 plt.title("Val. Loss")
 plt.xlabel('Epoch')
 plt.ylabel("Loss")
 plt.grid(True)
 plt.xlim(0,14)
+plt.ylim(0,0.65)
 
 plt.subplot(2,2,4)
 plt.title("Val. Acc.")
